@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import clip
 
-writer = SummaryWriter("CustomCLIP_experiment0401_online_nofc_ep=70")
+writer = SummaryWriter("CustomCLIP_experiment0402_online_fc_ep=30_every5batch")
 
 device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
@@ -84,10 +84,7 @@ class iCaRLmodel:
         
         #************************
 
-        # self.transform_ = transforms.Compose([
-        #                                       preprocess
-        #                                     ])
-
+ 
         self.transform = transforms.Compose([#transforms.ToTensor()
                                               preprocess
                                             ])
@@ -165,26 +162,17 @@ class iCaRLmodel:
             #images, target = images.to(device), target.to(device)
             print("indexs:*^^^^^^^^^^^^^^^^^^^^^^^^^",indexs)
             print("target:$$$$$$$$$$$$$$$$$$$$",np.shape(target))
-            # print("target_size",np.shape(target))
-            # print("imagesssssssssssssssss:",np.shape(images))
-            # print("step",step)
+
             if(step == 0):
                 for i in range(self.numclass-self.task_size,self.numclass):
-                    index = (target == i).nonzero(as_tuple = True)[0]
-                    # exemplar_ = images[index].detach().numpy()
-                    # exemplar_ = np.transpose(exemplar_, (0,2,3,1))
-                    # print("exemplar_.shape++++++++++++++",np.shape(exemplar_))
+                    index = (target == i).nonzero(as_tuple = True)[0] 
                     exemplar_ = images[index]
-                    #print("exemplarrrrrrrrrrrrrrrrrrrrr:",np.shape(exemplar_))
                     len_i = len(index)
                     self.len_indexs.append(len_i)
                     self.exemplar_set.append(exemplar_)
-                    # print("exemplar_llllllllllllllll:",len(self.exemplar_set))
-                    # print("exemplar__________________",np.shape(self.exemplar_set[i]))
+                  
                     
                 len_index_array = np.array(self.len_indexs)
-              
-                # print(len(np.where(len_index == 0)[0]))
 
 
                 if(len(np.where(len_index_array == 0)[0]) == 0):
@@ -195,7 +183,7 @@ class iCaRLmodel:
                     for i_class in range(len(self.exemplar_set)):
                         self.target_set[i_class] = torch.full([len(self.exemplar_set[i_class])],i_class)
 
-                    # self.len_indexs = len_index
+                    
                     print("******************end in step 0**********************")
                     break
             if(step !=0):
@@ -210,7 +198,6 @@ class iCaRLmodel:
                     if(len(np.where(len_index > m)[0]) > 0):
                         self._reduce_exemplar_sets_check(m)
                     self.steps = step
-                    #self.len_indexs = len_index
                     self.target_set = self.exemplar_set.copy()
                     for i_class in range(len(self.exemplar_set)):
                         self.target_set[i_class] = torch.full([len(self.exemplar_set[i_class])],i_class)
@@ -230,18 +217,12 @@ class iCaRLmodel:
     def _get_train_and_test_dataloader(self, classes):
         #self.train_dataset.getTrainData(classes, self.exemplar_set)
         self.train_dataset.getTrainData(classes)
-        # self.train_dataset_1.getTrainData(classes, self.exemplar_set)
         self.test_dataset.getTestData(classes)
         train_loader = DataLoader(dataset=self.train_dataset,
                                   shuffle=True,
                                   batch_size=self.batchsize,
                                   pin_memory=True,
                                   num_workers=4)
-        # train_loader_1 = DataLoader(dataset=self.train_dataset_1,
-        #                     shuffle=True,
-        #                     batch_size=self.batchsize,
-        #                     pin_memory=True,
-        #                     num_workers=4)
 
         test_loader = DataLoader(dataset=self.test_dataset,
                                  shuffle=True,
@@ -268,15 +249,12 @@ class iCaRLmodel:
     # evaluate model
     def train(self):
         self.model.eval()
-        # print("len_indexs++++++++++++++++",self.len_indexs)
-        # print("self.exemplar_set************",self.exemplar_set)
-        # print("len_indexs++++++++++++++++",self.len_indexs)
         print("train part exemplar set",np.shape(self.exemplar_set[0]))
         self.compute_exemplar_class_mean()
         self.model.train()
         accuracy = 0
         m=int(self.memory_size/self.numclass)
-        opt = optim.SGD(self.model.parameters(), lr=self.learning_rate, weight_decay=0.00001)
+        opt = optim.SGD(self.model.parameters(), lr=self.learning_rate, weight_decay=0.01)
         for epoch in range(self.epochs):
             # if epoch == 48:
             #     if self.numclass==self.task_size:
@@ -304,17 +282,17 @@ class iCaRLmodel:
             #          #opt = optim.SGD(self.model.parameters(), lr=self.learning_rate / 125,weight_decay=0.00001,momentum=0.9,nesterov=True,)
             #       print("change learning rate:%.3f" % (self.learning_rate / 100))
 
-            if epoch == 48:
+            if epoch == 20:
                 for p in opt.param_groups:
                     p['lr'] =self.learning_rate/ 5
                 
                 print("change learning rate:%.3f" % (self.learning_rate / 5))
-            elif epoch == 55:
+            elif epoch == 23:
                 for p in opt.param_groups:
                     p['lr'] =self.learning_rate/ 25
    
                 print("change learning rate:%.3f" % (self.learning_rate / 25))
-            elif epoch == 62:
+            elif epoch == 26:
                 for p in opt.param_groups:
                     p['lr'] =self.learning_rate/ 125
    
@@ -325,11 +303,11 @@ class iCaRLmodel:
                 if (step > self.steps):
 
                     #images, target = images.to(device), target.to(device)
-                    print("now the step is :",step)
+                    #print("now the step is :",step)
                     memory_images, memory_target = self.sample_exemplar_class(sample_size = 64)    #sample size = 64
                    # memory_images, memory_target = memory_images.to(device), memory_target.to(device)
-                    print("memory_images shape:",np.shape(memory_images))
-                    print("memory_images shape:",np.shape(memory_images))
+                    # print("memory_images shape:",np.shape(memory_images))
+                    # print("memory_images shape:",np.shape(memory_images))
                     all_images = torch.cat((images,memory_images),0)
                     all_target = torch.cat((target,memory_target),0)
 
@@ -337,15 +315,17 @@ class iCaRLmodel:
 
 
                     #output = self.model(images)
-                    loss_value = self._compute_feature_loss_(indexs, all_images, all_target)   # stop #########################
+                    #loss_value = self._compute_feature_loss_(indexs, all_images, all_target)   # stop #########################
+                    loss_value = self._compute_loss(indexs, all_images, all_target)
                     opt.zero_grad()
                     loss_value.backward()
                     opt.step()
                     #images, target = images.to(device), target.to(device)
                     self.update_exemplar_set(step, images, target)
 
-                # if(step%5==4):
-                #     print('epoch:%d,step:%d,loss:%.3f' % (epoch, step, loss_value.item()))
+                if(step%3==2):
+                    print('epoch:%d,step:%d,loss:%.3f' % (epoch, step, loss_value.item()))
+            self._reduce_exemplar_sets_check(m)
             accuracy = self._test(self.test_loader, 0)
             print('epoch:%d,accuracy:%.3f,loss:%.3f' % (epoch, accuracy,loss_value.item()))
             writer.add_scalar('Accuracy/train:%d' % (self.numclass), accuracy, epoch)
@@ -359,14 +339,18 @@ class iCaRLmodel:
     def sample_exemplar_class(self, sample_size):
         example_all = torch.cat(self.exemplar_set)
         indices = torch.randperm(len(example_all))[:sample_size]
-        if(len(example_all) < self.real_memory_size):
-            self.target_set = self.exemplar_set.copy()
-            for i_class in range(len(self.exemplar_set)):
-                self.target_set[i_class] = torch.full([len(self.exemplar_set[i_class])],i_class)
-            target_all = torch.cat(self.target_set)
+        self.target_set = self.exemplar_set.copy()
+        for i_class in range(len(self.exemplar_set)):
+            self.target_set[i_class] = torch.full([len(self.exemplar_set[i_class])],i_class)
+        target_all = torch.cat(self.target_set)
+        # if(len(example_all) < self.real_memory_size):
+        #     self.target_set = self.exemplar_set.copy()
+        #     for i_class in range(len(self.exemplar_set)):
+        #         self.target_set[i_class] = torch.full([len(self.exemplar_set[i_class])],i_class)
+        #     target_all = torch.cat(self.target_set)
         
-        else:
-            target_all = self.full_target_set.clone().detach()
+        # else:
+        #     target_all = self.full_target_set.clone().detach()
 
 
         return example_all[indices], target_all[indices]
@@ -376,18 +360,16 @@ class iCaRLmodel:
     def update_exemplar_set(self, step, images, target):
         self.model.eval()
         m=int(self.memory_size/self.numclass)
-        if(step > self.steps):
-            for i in range(self.numclass-self.task_size,self.numclass):
-                index = (target == i).nonzero(as_tuple = True)[0]
-                exemplar_ = images[index]
-                len_i = len(index)
-                self.exemplar_set[i] = torch.cat((self.exemplar_set[i],exemplar_),0)
-                self.len_indexs[i] = self.len_indexs[i] + len_i
-            
-            len_index_array = np.array(self.len_indexs)
-
-            if(len(np.where(len_index_array > m)[0]) > 0):
-                self._reduce_exemplar_sets_check(m)
+        for i in range(self.numclass-self.task_size,self.numclass):
+            index = (target == i).nonzero(as_tuple = True)[0]
+            exemplar_ = images[index]
+            len_i = len(index)
+            self.exemplar_set[i] = torch.cat((self.exemplar_set[i],exemplar_),0)
+            self.len_indexs[i] = self.len_indexs[i] + len_i
+        
+        #len_index_array = np.array(self.len_indexs)
+        if(step%5 == 0):
+            self._reduce_exemplar_sets_check(m)
         self.model.train()
 
 
@@ -412,6 +394,7 @@ class iCaRLmodel:
 
     def _compute_loss(self, indexs, imgs, target):
         output=self.model(imgs)
+       
         target = get_one_hot(target, self.numclass)
         output, target = output.to(device), target.to(device)
         if self.old_model == None:
@@ -431,8 +414,9 @@ class iCaRLmodel:
         
         output, target = output.to(device), target.to(device)
         if self.old_model == None:
-            #print("loss_classify:",F.binary_cross_entropy_with_logits(output, target))
-            return F.binary_cross_entropy_with_logits(output, target)
+            loss_classify = F.binary_cross_entropy_with_logits(output, target)
+            print("loss_classify:",loss_classify)
+            return loss_classify
         else:
             loss_classify = F.binary_cross_entropy_with_logits(output, target)
             #old_target = torch.tensor(np.array([self.old_model_output[index.item()] for index in indexs]))
@@ -464,7 +448,7 @@ class iCaRLmodel:
         writer.add_scalar('NMS_acc', KNN_accuracy.item(), self.numclass)
         self.numclass+=self.task_size
         print("NMS accuracy："+str(KNN_accuracy.item()))
-        filename='model/accuracy:%.3f_KNN_accuracy:%.3f_increment:%d_net.pkl' % (accuracy, KNN_accuracy, i + 10)
+        filename='model/accuracy:%.3f_KNN_accuracy:%.3f_increment:%d_net.pkl' % (accuracy, KNN_accuracy, int(self.numclass-1) + 10)
         torch.save(self.model,filename)
         self.old_model=torch.load(filename)
         self.old_model.to(device)
@@ -543,8 +527,8 @@ class iCaRLmodel:
         x = images[0].unsqueeze(0)
         for index in range(1, len(images)):
             x = torch.cat((x, images[index].unsqueeze(0)), dim=0)
-        print("x**********************shape:",np.shape(x))
-        # print("x****************************:",x)
+        #print("x**********************shape:",np.shape(x))
+        
         # feature_extractor_output = F.normalize(self.model.feature_extractor(x).detach()).cpu().numpy()
         x = x.to(device)
         feature_extractor_output = self.model.feature_extractor(x).detach().cpu().numpy()
@@ -555,7 +539,7 @@ class iCaRLmodel:
     def compute_exemplar_class_mean(self):
         self.class_mean_set = []
         self.feature_extractor_output_set = []
-        print("len of exemplar:",len(self.exemplar_set))
+        #print("len of exemplar:",len(self.exemplar_set))
 
         for index in range(len(self.exemplar_set)):
             # print("compute the class mean of %s"%(str(index)))
@@ -564,7 +548,7 @@ class iCaRLmodel:
             class_mean, feature_extractor_output = self.compute_class_mean(exemplar, self.transform)
             # class_mean_,_=self.compute_class_mean(exemplar,self.classify_transform)
             # class_mean=(class_mean/np.linalg.norm(class_mean)+class_mean_/np.linalg.norm(class_mean_))/2
-            class_mean = class_mean/np.linalg.norm(class_mean)
+            #class_mean = class_mean/np.linalg.norm(class_mean)
             self.class_mean_set.append(class_mean)
             self.feature_extractor_output_set.append(feature_extractor_output)
 
@@ -586,16 +570,21 @@ class iCaRLmodel:
         
         test = self.model(test).to(device)
         test.requires_grad_(True)
-        with torch.no_grad():
-            class_mean_set = torch.tensor(np.array(self.class_mean_set)).to(device)
+        class_mean_set = torch.tensor(np.array(self.class_mean_set)).to(device)
         for target in test:
             x = target - class_mean_set
-            x = torch.linalg.norm(x, ord=2, axis=1)
-            m = nn.Softmin(dim=0)
-            x = m(x)
+            # x = torch.linalg.norm(x, ord=2, axis=1)
+            # m = nn.Softmin(dim=0)
+            # x = m(x)
+
             # x = torch.argmin(x)
             result.append(x)
-        return torch.stack(result)
+        result = torch.stack(result)
+        result = torch.linalg.norm(result, ord=2, axis=2)
+        m = nn.Softmin(dim=1)
+        result = m(result)
+
+        return result
 
     # def softmax(self, x):
     # """Compute softmax values for each sets of scores in x."""
